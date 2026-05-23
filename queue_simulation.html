@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Queue Simulation — Snapshot Viewer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f4f6fb;color:#222;min-height:100vh}
+header{background:#1F3864;color:#fff;padding:1.2rem 2rem;display:flex;align-items:center;gap:1rem}
+header h1{font-size:1.3rem;font-weight:600}
+header span{font-size:.85rem;opacity:.7}
+.container{max-width:1100px;margin:2rem auto;padding:0 1rem}
+.card{background:#fff;border-radius:12px;border:1px solid #e0e4ef;padding:1.5rem;margin-bottom:1.2rem}
+.card-title{font-size:.75rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem}
+.mode-tabs{display:flex;gap:8px;margin-bottom:1rem}
+.tab{padding:7px 18px;border-radius:8px;border:1px solid #d0d5e8;background:transparent;font-size:13px;cursor:pointer;color:#444;transition:all .15s}
+.tab.active{background:#1F3864;color:#fff;border-color:#1F3864}
+.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:200px}
+.field label{font-size:13px;color:#666}
+.field input{padding:8px 12px;border:1px solid #d0d5e8;border-radius:8px;font-size:14px;width:100%}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:.8rem}
+.btn-run{padding:10px 28px;border-radius:8px;border:none;background:#1F3864;color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin-top:.5rem}
+.btn-run:hover{background:#2E75B6}
+.btn-gen{padding:7px 16px;border-radius:8px;border:1px solid #d0d5e8;background:#f4f6fb;font-size:13px;cursor:pointer;margin-bottom:.5rem}
+.preview{font-size:12px;color:#666;margin-top:4px;line-height:1.6}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#1F3864;color:#fff;padding:9px 10px;text-align:center;font-weight:500}
+td{padding:8px 10px;text-align:center;border-bottom:1px solid #f0f0f0}
+tr:hover td{background:#f9fafc}
+tr.wait td{background:#fff8dc}
+tr.nosvc td{color:#bbb}
+.badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:6px;font-weight:600}
+.badge-wait{background:#fff0b3;color:#7a5c00}
+.badge-ok{background:#d4f5d4;color:#1a6b1a}
+.badge-no{background:#f0f0f0;color:#888}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:#f4f6fb;border-radius:10px;padding:1rem;text-align:center}
+.stat-label{font-size:12px;color:#888;margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:700;color:#1F3864}
+.tl-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.tl-label{width:50px;text-align:right;font-size:12px;color:#888;flex-shrink:0}
+.tl-wrap{flex:1;position:relative;height:20px;background:#f0f2f8;border-radius:4px;overflow:hidden}
+.tl-wait{position:absolute;height:100%;background:#f0d080;opacity:.9}
+.tl-svc{position:absolute;height:100%;background:#2E75B6;border-radius:2px}
+.tl-end{font-size:11px;color:#aaa;width:45px;flex-shrink:0}
+.legend{display:flex;gap:16px;font-size:12px;color:#666;margin-bottom:.6rem}
+.legend span{display:flex;align-items:center;gap:5px}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+.err{color:#c0392b;font-size:13px;margin-top:.5rem}
+#results{display:none}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Queue Simulation — Snapshot Viewer</h1>
+    <span>Single-Server Queuing System</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <div class="card-title">Input mode</div>
+    <div class="mode-tabs">
+      <button class="tab active" onclick="setMode('manual')" id="tab-manual">Manual entry</button>
+      <button class="tab" onclick="setMode('random')" id="tab-random">Random generate</button>
+    </div>
+
+    <div id="panel-manual">
+      <div class="row">
+        <div class="field">
+          <label>Inter-arrival times (comma separated)</label>
+          <input type="text" id="iat-input" value="0.4,1.2,0.5,1.7,0.2,1.2,0.4,1.6"/>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Service times (comma separated)</label>
+          <input type="text" id="svc-input" value="2,0.7,0.2,1.1,3.7"/>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-random" style="display:none">
+      <div class="row">
+        <div class="field">
+          <label>Number of customers</label>
+          <input type="number" id="rnd-n" value="8" min="2" max="30"/>
+        </div>
+        <div class="field">
+          <label>Avg inter-arrival time (min)</label>
+          <input type="number" id="rnd-iat" value="1.0" step="0.1" min="0.1"/>
+        </div>
+        <div class="field">
+          <label>Avg service time (min)</label>
+          <input type="number" id="rnd-svc" value="1.5" step="0.1" min="0.1"/>
+        </div>
+        <div class="field">
+          <label>Customers with service data</label>
+          <input type="number" id="rnd-served" value="5" min="1" max="30"/>
+        </div>
+      </div>
+      <button class="btn-gen" onclick="generateRandom()">Generate random values</button>
+      <div class="preview" id="rnd-preview"></div>
+    </div>
+
+    <div class="err" id="err-msg"></div>
+    <button class="btn-run" onclick="runSim()">Run Simulation</button>
+  </div>
+
+  <div id="results">
+    <div class="card">
+      <div class="card-title">Snapshot table — every event</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Inter-arrival</th><th>Arrival time</th><th>Service time</th>
+              <th>Service start</th><th>Service end</th><th>Wait time</th>
+              <th>Server idle</th><th>Time in system</th><th>Queue length</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="sim-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Gantt timeline</div>
+      <div class="legend">
+        <span><span class="dot" style="background:#f0d080"></span>Waiting in queue</span>
+        <span><span class="dot" style="background:#2E75B6"></span>Being served</span>
+      </div>
+      <div id="timeline"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Summary statistics</div>
+      <div class="stats-grid" id="stats-grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let mode='manual', rndIAT=[], rndSVC=[];
+
+function setMode(m){
+  mode=m;
+  document.getElementById('panel-manual').style.display=m==='manual'?'':'none';
+  document.getElementById('panel-random').style.display=m==='random'?'':'none';
+  document.getElementById('tab-manual').classList.toggle('active',m==='manual');
+  document.getElementById('tab-random').classList.toggle('active',m==='random');
+}
+
+function expRandom(mean){ return -mean*Math.log(1-Math.random()); }
+
+function generateRandom(){
+  const n=parseInt(document.getElementById('rnd-n').value)||8;
+  const mI=parseFloat(document.getElementById('rnd-iat').value)||1.0;
+  const mS=parseFloat(document.getElementById('rnd-svc').value)||1.5;
+  const served=Math.min(parseInt(document.getElementById('rnd-served').value)||5,n);
+  rndIAT=Array.from({length:n},()=>parseFloat(expRandom(mI).toFixed(2)));
+  rndSVC=Array.from({length:served},()=>parseFloat(expRandom(mS).toFixed(2)));
+  document.getElementById('rnd-preview').innerHTML=
+    '<b>IAT:</b> '+rndIAT.join(', ')+'<br><b>SVC:</b> '+rndSVC.join(', ');
+}
+
+function parse(s){ return s.split(',').map(v=>parseFloat(v.trim())).filter(v=>!isNaN(v)); }
+
+function runSim(){
+  document.getElementById('err-msg').textContent='';
+  let iats,svcs;
+  if(mode==='manual'){
+    iats=parse(document.getElementById('iat-input').value);
+    svcs=parse(document.getElementById('svc-input').value);
+  } else {
+    if(!rndIAT.length) generateRandom();
+    iats=rndIAT; svcs=rndSVC;
+  }
+  if(!iats.length){document.getElementById('err-msg').textContent='Enter valid inter-arrival times.';return;}
+  if(!svcs.length){document.getElementById('err-msg').textContent='Enter valid service times.';return;}
+
+  const n=iats.length;
+  const arrival=[],svc=[],start=[],end_=[],wait=[],idle=[],tis=[];
+
+  for(let i=0;i<n;i++){
+    const arr=parseFloat(iats.slice(0,i+1).reduce((a,b)=>a+b,0).toFixed(4));
+    arrival.push(arr);
+    if(i<svcs.length){
+      const s=svcs[i];
+      const ss=i===0?arr:parseFloat(Math.max(arr,end_[i-1]).toFixed(4));
+      const se=parseFloat((ss+s).toFixed(4));
+      const w=parseFloat((ss-arr).toFixed(4));
+      const id=i===0?arr:parseFloat(Math.max(0,arr-end_[i-1]).toFixed(4));
+      const ti=parseFloat((se-arr).toFixed(4));
+      svc.push(s);start.push(ss);end_.push(se);wait.push(w);idle.push(id);tis.push(ti);
+    } else {
+      svc.push(null);start.push(null);end_.push(null);wait.push(null);idle.push(null);tis.push(null);
+    }
+  }
+
+  const tbody=document.getElementById('sim-body');
+  tbody.innerHTML='';
+  for(let i=0;i<n;i++){
+    const ql=arrival.slice(0,i).filter((a,j)=>end_[j]!==null&&a<=arrival[i]&&arrival[i]<end_[j]).length;
+    const has=svc[i]!==null;
+    const isW=has&&wait[i]>0;
+    const tr=document.createElement('tr');
+    if(isW)tr.className='wait';else if(!has)tr.className='nosvc';
+    const badge=has?(isW?'<span class="badge badge-wait">waited</span>':'<span class="badge badge-ok">direct</span>'):'<span class="badge badge-no">no data</span>';
+    tr.innerHTML=`<td>${i+1}</td><td>${iats[i]}</td><td>${arrival[i]}</td><td>${has?svc[i]:'—'}</td><td>${has?start[i]:'—'}</td><td>${has?end_[i]:'—'}</td><td>${has?wait[i]:'—'}</td><td>${has?idle[i]:'—'}</td><td>${has?tis[i]:'—'}</td><td>${ql}</td><td>${badge}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  const servedEnds=end_.filter(v=>v!==null);
+  const maxT=servedEnds.length?Math.max(...servedEnds):10;
+  const tl=document.getElementById('timeline');
+  tl.innerHTML='';
+  for(let i=0;i<n;i++){
+    if(svc[i]===null)continue;
+    const pct=v=>(v/maxT*100).toFixed(2)+'%';
+    const row=document.createElement('div');
+    row.className='tl-row';
+    row.innerHTML=`<div class="tl-label">C${i+1}</div><div class="tl-wrap">${wait[i]>0?`<div class="tl-wait" style="left:${pct(arrival[i])};width:${pct(wait[i])}"></div>`:''}<div class="tl-svc" style="left:${pct(start[i])};width:${pct(svc[i])}"></div></div><div class="tl-end">${end_[i]}m</div>`;
+    tl.appendChild(row);
+  }
+
+  const sw=wait.filter(v=>v!==null);
+  const ss2=svc.filter(v=>v!==null);
+  const st=tis.filter(v=>v!==null);
+  const si=idle.filter(v=>v!==null);
+  const simEnd=servedEnds.length?Math.max(...servedEnds):0;
+  const util=simEnd>0?((simEnd-si.reduce((a,b)=>a+b,0))/simEnd*100).toFixed(1):0;
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat"><div class="stat-label">Avg waiting time</div><div class="stat-val">${(sw.reduce((a,b)=>a+b,0)/sw.length).toFixed(3)} min</div></div>
+    <div class="stat"><div class="stat-label">Avg service time</div><div class="stat-val">${(ss2.reduce((a,b)=>a+b,0)/ss2.length).toFixed(3)} min</div></div>
+    <div class="stat"><div class="stat-label">Avg time in system</div><div class="stat-val">${(st.reduce((a,b)=>a+b,0)/st.length).toFixed(3)} min</div></div>
+    <div class="stat"><div class="stat-label">Total idle time</div><div class="stat-val">${si.reduce((a,b)=>a+b,0).toFixed(3)} min</div></div>
+    <div class="stat"><div class="stat-label">Simulation end</div><div class="stat-val">${simEnd} min</div></div>
+    <div class="stat"><div class="stat-label">Server utilization</div><div class="stat-val">${util}%</div></div>`;
+
+  document.getElementById('results').style.display='';
+}
+
+runSim();
+</script>
+</body>
+</html>
